@@ -59,6 +59,14 @@ LOCATION_PATTERNS = [
     r'(\d+[号#]?\s*(?:楼|层|室|厅|会议室|房间|办公室|餐厅|咖啡厅))',
 ]
 
+CALENDAR_URI_MAP = {
+    "工作": "work",
+    "家庭": "family",
+    "个人": "personal",
+    "健康": "health",
+    "生日": "birthday",
+}
+
 CALENDAR_HINTS = {
     "工作": ["开会", "会议", "汇报", "周报", "项目", "需求", "评审", "上线", "面试",
              "出差", "培训", "讨论", "方案", "客户", "合同", "预算", "KPI", "OKR",
@@ -405,7 +413,7 @@ def parse(text, username="default"):
         "location": location,
         "description": description,
         "calendar": calendar,
-        "calendar_uri": calendar.lower(),
+        "calendar_uri": CALENDAR_URI_MAP.get(calendar, calendar.lower()),
         "username": username,
         "confidence": confidence,
         "time_method": time_method,

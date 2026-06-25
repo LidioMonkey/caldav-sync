@@ -45,6 +45,7 @@ COMMAND=""
 USERNAME=""
 PASSWORD=""
 NEW_PASSWORD=""
+YES=false
 
 # ── Parse Arguments ──────────────────────────────────────────────────────────
 COMMAND="${1:-}"
@@ -55,8 +56,9 @@ while [[ $# -gt 0 ]]; do
         --username)     USERNAME="$2"; shift 2 ;;
         --password)     PASSWORD="$2"; shift 2 ;;
         --new-password) NEW_PASSWORD="$2"; shift 2 ;;
-        --install-dir)  INSTALL_DIR="$2"; shift 2 ;;
-        --help|-h)
+    --install-dir)  INSTALL_DIR="$2"; shift 2 ;;
+    --yes)          YES=true; shift ;;
+    --help|-h)
             head -26 "$0" | tail -22
             exit 0
             ;;
@@ -223,24 +225,40 @@ case "$COMMAND" in
             die "Database not found: $DB_FILE"
         fi
 
-        read -r -p "$(echo -e "${YELLOW}Are you sure you want to delete user '$USERNAME' and all their data? [y/N] ${NC}")" CONFIRM
-        if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-            info "Cancelled"
-            exit 0
+        if [[ "$YES" != true ]]; then
+            read -r -p "$(echo -e "${YELLOW}Are you sure you want to delete user '$USERNAME' and all their data? [y/N] ${NC}")" CONFIRM
+            if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+                info "Cancelled"
+                exit 0
+            fi
         fi
 
+        # Delete in correct order: calendar objects -> calendars -> principals -> user
         DEL_RESULT=$("$PHP_BIN" -r "
             try {
                 \$db = new SQLite3('$DB_FILE');
                 \$db->enableExceptions(true);
                 \$db->exec('BEGIN');
 
+                // Get calendar IDs first
+                \$calIds = [];
+                \$result = \$db->query(\"SELECT id FROM calendars WHERE principaluri = 'principals/${USERNAME}'\");
+                while (\$row = \$result->fetchArray(SQLITE3_NUM)) {
+                    \$calIds[] = \$row[0];
+                }
+
+                // Delete calendar objects
+                if (!empty(\$calIds)) {
+                    \$calIdList = implode(',', array_map('intval', \$calIds));
+                    \$db->exec(\"DELETE FROM calendarobjects WHERE calendarid IN (\$calIdList)\");
+                }
+
                 // Delete calendars
                 \$db->exec(\"DELETE FROM calendars WHERE principaluri = 'principals/${USERNAME}'\");
-                // Delete calendar objects (events)
-                \$db->exec(\"DELETE FROM calendarobjects WHERE calendarid IN (SELECT id FROM calendars WHERE principaluri = 'principals/${USERNAME}')\");
+
                 // Delete principals
                 \$db->exec(\"DELETE FROM principals WHERE uri = 'principals/${USERNAME}'\");
+
                 // Delete user
                 \$db->exec(\"DELETE FROM users WHERE username = '${USERNAME}'\");
 

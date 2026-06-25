@@ -203,20 +203,20 @@ cmd_list() {
 
     local where=""
     if [[ -n "$USERNAME" ]]; then
-        where="WHERE c.principaluri = 'principals/$USERNAME'"
+        where="WHERE principaluri = 'principals/$USERNAME'"
     fi
 
     sqlite3 -header -column "$DB_FILE" << SQL
 SELECT
-    REPLACE(c.principaluri, 'principals/', '') AS user,
-    c.uri AS calendar_id,
-    c.displayname AS display_name,
-    c.calendarcolor AS color,
-    COALESCE((SELECT COUNT(*) FROM calendarobjects co WHERE co.calendarid = c.id), 0) AS events,
-    c.components
-FROM calendars c
+    REPLACE(principaluri, 'principals/', '') AS user,
+    uri AS calendar_id,
+    displayname AS display_name,
+    calendarcolor AS color,
+    COALESCE((SELECT COUNT(*) FROM calendarobjects co WHERE co.calendarid = calendars.id), 0) AS events,
+    components
+FROM calendars
 $where
-ORDER BY c.principaluri, c.uri;
+ORDER BY principaluri, uri;
 SQL
 
     echo ""
